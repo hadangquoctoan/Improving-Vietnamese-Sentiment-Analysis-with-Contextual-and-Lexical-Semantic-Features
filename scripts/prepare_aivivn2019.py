@@ -109,6 +109,19 @@ def _processed_texts(path: Path) -> set[str]:
     return texts
 
 
+def _uit_raw_texts() -> set[str]:
+    texts = set()
+    for split in ("train", "dev", "test"):
+        path = ROOT / "data" / "raw" / "uit-vsfc" / f"{split}_sents.txt"
+        if path.is_file():
+            texts.update(
+                normalize_basic(line)
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            )
+    return texts
+
+
 def _parse_args():
     parser = argparse.ArgumentParser(description="Prepare AIVIVN 2019 JSONL.")
     parser.add_argument("--raw-dir", default=str(RAW_DIR))
@@ -136,6 +149,10 @@ def _build_manifest(raw, processed, raw_dir, outputs):
     train_texts = {row["text"] for row in processed["train"]}
     dev_texts = {row["text"] for row in processed["dev"]}
     test_texts = {row["text"] for row in processed["test"]}
+    test_raw_texts = {normalize_basic(row["text"]) for row in raw["test"]}
+    test_ids_all_train_prefix = all(
+        row["id"].startswith("train_") for row in raw["test"]
+    )
     return {
         "dataset": "AIVIVN 2019 (user-provided binary CSV; test likely split from train)",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -179,12 +196,12 @@ def _build_manifest(raw, processed, raw_dir, outputs):
             "train_dev_exact_overlap": len(train_texts & dev_texts),
             "train_test_exact_overlap": len(train_texts & test_texts),
             "dev_test_exact_overlap": len(dev_texts & test_texts),
-            "test_overlap_uit_raw": 0,
+            "test_overlap_uit_raw": len(test_raw_texts & _uit_raw_texts()),
             "test_overlap_vlsp_test": len(
                 {row["text"].replace("_", " ") for row in processed["test"]}
                 & _processed_texts(ROOT / "data" / "processed" / "vlsp2016" / "test.jsonl")
             ),
-            "test_ids_all_train_prefix": True,
+            "test_ids_all_train_prefix": test_ids_all_train_prefix,
         },
         "notes": [
             "No deduplication; source order preserved except stratified train/dev split.",
