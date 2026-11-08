@@ -51,4 +51,4 @@ def _print_hidden(phobert_branch, batch, hidden) -> None:
         f"  pooled     : norm={pooled.norm().item():.4f} "
         f"mean={pooled.mean().item():+.4f} first8=[{first8}]"
     )
-    print("  (chưa có classifier 3 lớp; đây là hidden states PhoBERT)")
+    print("  (hidden states PhoBERT; classifier tạo logits [B,3] hoặc [B,2] tùy checkpoint)")
