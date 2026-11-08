@@ -12,7 +12,7 @@ from vnsentiment.training.data import load_split
 from vnsentiment.training.factory import build_sentiment_model
 from vnsentiment.training.metrics import compute_metrics
 
-_LEXICON_PATH = (
+_DEFAULT_LEXICON_PATH = (
     Path(__file__).resolve().parents[3]
     / "data"
     / "lexicons"
@@ -30,23 +30,33 @@ def evaluate_test(
     report_path: str | Path,
     device: str = "cpu",
     batch_size: int = 8,
+    lexicon_path: str | Path | None = None,
 ) -> dict:
     checkpoint_path = Path(checkpoint_path)
     report_path = Path(report_path)
     if report_path.exists():
         raise FileExistsError(f"test report already exists: {report_path}")
+    resolved_lexicon = (
+        Path(lexicon_path) if lexicon_path is not None else _DEFAULT_LEXICON_PATH
+    )
 
     payload = torch.load(
         checkpoint_path, map_location=device, weights_only=True
     )
-    model = build_sentiment_model(device)
+    model = build_sentiment_model(device, lexicon_path=resolved_lexicon)
     model.load_state_dict(payload["model_state"])
     model.eval()
 
     test_samples = load_split("test", allow_test=True)
     metrics = _evaluate_samples(model, test_samples, batch_size)
     report = _build_report(
-        checkpoint_path, payload, test_samples, model.lexicon.store, metrics, device
+        checkpoint_path,
+        payload,
+        test_samples,
+        model.lexicon.store,
+        metrics,
+        device,
+        resolved_lexicon,
     )
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,7 +67,7 @@ def evaluate_test(
 
 
 def _build_report(
-    checkpoint_path, payload, test_samples, store, metrics, device
+    checkpoint_path, payload, test_samples, store, metrics, device, lexicon
 ) -> dict:
     return {
         "run_id": _run_id(checkpoint_path),
@@ -76,8 +86,8 @@ def _build_report(
             "split_sha256": _split_hashes(),
         },
         "lexicon": {
-            "path": str(_LEXICON_PATH),
-            "sha256": _sha256(_LEXICON_PATH),
+            "path": str(lexicon),
+            "sha256": _sha256(lexicon),
         },
         "runtime": _runtime(device),
         "metrics": _metrics_dict(metrics),

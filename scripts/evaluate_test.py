@@ -37,6 +37,11 @@ def main() -> int:
         "--device", choices=("auto", "cpu", "cuda"), default="auto"
     )
     parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument(
+        "--lexicon-path",
+        default=None,
+        help="Composite JSON; mặc định dùng v0.2.0 của LexiconStore.",
+    )
     args = parser.parse_args()
 
     report = evaluate_test(
@@ -44,6 +49,7 @@ def main() -> int:
         args.report,
         device=_resolve_device(args.device),
         batch_size=args.batch_size,
+        lexicon_path=args.lexicon_path,
     )
     metrics = report["metrics"]
     print(f"test accuracy: {metrics['accuracy']:.4f}")

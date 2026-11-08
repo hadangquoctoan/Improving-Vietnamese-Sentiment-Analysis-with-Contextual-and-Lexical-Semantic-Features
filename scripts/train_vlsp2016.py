@@ -47,6 +47,11 @@ def _parse_args():
     parser.add_argument("--dev-ratio", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--checkpoint", default=str(DEFAULT_CHECKPOINT))
+    parser.add_argument(
+        "--lexicon-path",
+        default=None,
+        help="Composite JSON; mặc định dùng v0.2.0 của LexiconStore.",
+    )
     args = parser.parse_args()
     if not 1 <= args.epochs <= 20:
         parser.error("--epochs must be between 1 and 20")
@@ -107,7 +112,7 @@ def main() -> int:
         print(f"train/dev rows: {len(fit)}/{len(dev)}")
         print(f"split manifest: {SPLIT_MANIFEST}")
 
-    model = build_sentiment_model(device)
+    model = build_sentiment_model(device, lexicon_path=args.lexicon_path)
     trainer = Trainer(
         model,
         device=device,

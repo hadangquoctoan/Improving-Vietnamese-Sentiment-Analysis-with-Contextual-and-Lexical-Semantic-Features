@@ -42,6 +42,11 @@ def _parse_args():
     parser.add_argument("--accum", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--checkpoint", default=str(DEFAULT_CHECKPOINT))
+    parser.add_argument(
+        "--lexicon-path",
+        default=None,
+        help="Composite JSON; mặc định dùng v0.2.0 của LexiconStore.",
+    )
     args = parser.parse_args()
     if not 1 <= args.epochs <= 10:
         parser.error("--epochs must be between 1 and 10")
@@ -67,7 +72,7 @@ def main() -> int:
         checkpoint = None
         print("smoke: 200 train samples, 1 epoch, no checkpoint")
 
-    model = build_sentiment_model(device)
+    model = build_sentiment_model(device, lexicon_path=args.lexicon_path)
     trainer = Trainer(
         model,
         device=device,

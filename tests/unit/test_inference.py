@@ -76,11 +76,19 @@ class SentimentPredictorTests(unittest.TestCase):
             torch.save({"model_state": self.model.state_dict()}, checkpoint)
             with mock.patch(
                 "vnsentiment.inference.build_sentiment_model",
-                side_effect=lambda device, num_labels=3: _build_model(self.store),
-            ):
+                side_effect=lambda device, num_labels=3, lexicon_path=None: _build_model(
+                    self.store
+                ),
+            ) as builder:
                 loaded = SentimentPredictor.from_checkpoint(
-                    checkpoint, device="cpu"
+                    checkpoint,
+                    device="cpu",
+                    lexicon_path="custom_lexicon.json",
                 )
+
+        builder.assert_called_once_with(
+            "cpu", lexicon_path="custom_lexicon.json", num_labels=3
+        )
 
         actual = loaded.predict(["tốt này không tệ"])
         self.assertEqual(actual[0]["label"], expected[0]["label"])

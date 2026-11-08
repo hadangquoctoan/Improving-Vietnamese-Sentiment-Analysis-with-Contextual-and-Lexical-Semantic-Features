@@ -21,6 +21,9 @@ from vnsentiment.training.metrics import compute_metrics  # noqa: E402
 
 DEFAULT_CHECKPOINT = ROOT / "artifacts" / "checkpoints" / "aivivn2019_best.pt"
 DEFAULT_REPORT = ROOT / "artifacts" / "reports" / "aivivn2019_test.json"
+DEFAULT_LEXICON = (
+    ROOT / "data" / "lexicons" / "composite_12d" / "v0.2.0" / "composite_lexicon.json"
+)
 MANIFEST = ROOT / "data" / "processed" / "aivivn2019" / "manifest.json"
 LABELS = ("Neg", "Pos")
 
@@ -71,15 +74,20 @@ def _parse_args():
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--training-dataset", default="AIVIVN 2019 train")
     parser.add_argument("--note", action="append", default=[])
+    parser.add_argument(
+        "--lexicon-path",
+        default=None,
+        help="Composite JSON; mặc định dùng v0.2.0 của LexiconStore.",
+    )
     return parser.parse_args()
 
 
-def _run_predictions(checkpoint, device, batch_size):
+def _run_predictions(checkpoint, device, batch_size, lexicon_path):
     samples = load_aivivn2019("test", allow_test=True)
     texts = [sample["text"] for sample in samples]
     labels = torch.tensor([sample["label"] for sample in samples])
     predictor = SentimentPredictor.from_checkpoint(
-        checkpoint, device, labels=LABELS
+        checkpoint, device, labels=LABELS, lexicon_path=lexicon_path
     )
     results = predictor.predict(texts, batch_size=batch_size)
     preds = torch.tensor([result["label_id"] for result in results])
@@ -88,7 +96,7 @@ def _run_predictions(checkpoint, device, batch_size):
 
 def _build_report(
     checkpoint, payload, samples, texts, metrics, matrix, device,
-    training_dataset, extra_notes
+    training_dataset, extra_notes, lexicon
 ):
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     return {
@@ -100,6 +108,10 @@ def _build_report(
             "dev_metrics": payload.get("dev_metrics"),
             "seed": payload.get("seed"),
             "config": payload.get("config"),
+        },
+        "lexicon": {
+            "path": str(lexicon),
+            "sha256": _sha256(lexicon),
         },
         "dataset": {
             "name": manifest["dataset"],
@@ -155,15 +167,16 @@ def main() -> int:
         raise FileExistsError(f"benchmark report already exists: {report_path}")
 
     device = _resolve_device(args.device)
+    lexicon = Path(args.lexicon_path) if args.lexicon_path else DEFAULT_LEXICON
     payload = torch.load(checkpoint, map_location="meta", weights_only=True)
     samples, texts, labels, preds = _run_predictions(
-        checkpoint, device, args.batch_size
+        checkpoint, device, args.batch_size, lexicon
     )
     metrics = compute_metrics(preds, labels, num_classes=2)
     matrix = _confusion(preds, labels)
     report = _build_report(
         checkpoint, payload, samples, texts, metrics, matrix, device,
-        args.training_dataset, args.note,
+        args.training_dataset, args.note, lexicon,
     )
 
     report_path.parent.mkdir(parents=True, exist_ok=True)

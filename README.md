@@ -103,7 +103,7 @@ D:/anaconda/envs/nlpdevelop/python.exe scripts/make_benchmark_figures.py
   - `v0.3.2` — WordNet synonym + guard VAD: 9.791 entries; polarity train 23,70% → 27,45%.
   - `v0.3.3` — thêm fastText kNN + guard: 9.888 entries; polarity train 23,70% → 27,86%.
   - `v0.3.0`/`v0.3.1` là bản trước guard, chỉ giữ làm bằng chứng audit.
-- `factory.build_sentiment_model(..., lexicon_path=...)` đã hỗ trợ chọn version; CLI train hiện vẫn mặc định `v0.2.0`.
+- `factory.build_sentiment_model(..., lexicon_path=...)` và các CLI train/eval/inference đã hỗ trợ `--lexicon-path`; mặc định vẫn là `v0.2.0`.
 - Build lại:
   ```bash
   D:/anaconda/envs/nlpdevelop/python.exe scripts/build_expanded_lexicon.py \

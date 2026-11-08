@@ -99,11 +99,11 @@ class EvaluateTestTests(unittest.TestCase):
             with mock.patch.object(
                 evaluate,
                 "build_sentiment_model",
-                side_effect=lambda device: _build_model(self.store),
+                side_effect=lambda device, lexicon_path=None: _build_model(self.store),
             ), mock.patch.object(
                 evaluate, "load_split", side_effect=fake_load_split
             ), mock.patch.object(
-                evaluate, "_LEXICON_PATH", FIXTURE
+                evaluate, "_DEFAULT_LEXICON_PATH", FIXTURE
             ), mock.patch.object(
                 evaluate, "_MANIFEST_PATH", manifest
             ):

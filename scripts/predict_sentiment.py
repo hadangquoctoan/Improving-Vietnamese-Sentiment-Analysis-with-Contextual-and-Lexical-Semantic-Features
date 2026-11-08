@@ -39,6 +39,11 @@ def _parse_args():
         action="store_true",
         help="Input đã tách từ bằng dấu gạch dưới (bỏ qua VnCoreNLP).",
     )
+    parser.add_argument(
+        "--lexicon-path",
+        default=None,
+        help="Composite JSON; mặc định dùng v0.2.0 của LexiconStore.",
+    )
     return parser.parse_args()
 
 
@@ -76,7 +81,9 @@ def main() -> int:
     args = _parse_args()
     try:
         predictor = SentimentPredictor.from_checkpoint(
-            args.checkpoint, device=_resolve_device(args.device)
+            args.checkpoint,
+            device=_resolve_device(args.device),
+            lexicon_path=args.lexicon_path,
         )
     except Exception as error:
         print(f"Lỗi nạp checkpoint: {error}", file=sys.stderr)
