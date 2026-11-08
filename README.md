@@ -1,64 +1,122 @@
 # Vietnamese sentiment foundation
 
-## Trạng thái hiện tại
+Research foundation for Vietnamese sentiment classification: PhoBERT contextual embeddings fused with an external 12-dimensional lexicon branch (polarity, VAD, eight emotions). Evaluated on UIT-VSFC (3-class), VLSP2016 (3-class) and AIVIVN 2019 (binary).
 
-Đã reset bản nháp source/test cũ và dựng foundation theo từng miền trách nhiệm (Giai đoạn A). Package hiện chỉ có các ranh giới thư mục và bộ kiểm thử kiến trúc; chưa có model, lexicon loader, alignment, training hoặc inference mới.
+> Đây là code nghiên cứu, không phải sản phẩm production. Số liệu chỉ có giá trị với đúng dataset, split, seed và checkpoint ghi trong `artifacts/reports/`.
 
-Các API cũ như `SentimentModel`, `load_lexicon`, `normalize_vietnamese` và `train_one_epoch` không còn khả dụng. Backup source/test trước reset nằm trong `artifacts/backups/`, có SHA-256 manifest được xác minh trước khi xóa. Không import code từ backup vào package mới.
+## Pipeline
 
-## Môi trường và kiểm thử
-
-Python >= 3.12, dùng Conda `nlpdevelop`; không tạo `.venv` trong workspace. Với máy hiện tại:
-
-```bash
-"D:/anaconda/envs/nlpdevelop/python.exe" -m pip install "pytest>=8.0"
-"D:/anaconda/envs/nlpdevelop/python.exe" -m pytest tests/ -q
-"D:/anaconda/envs/nlpdevelop/python.exe" -m pytest tests/architecture/ -q
-"D:/anaconda/envs/nlpdevelop/python.exe" -m pytest tests/architecture/test_dependency_direction.py -q
+```text
+text (đã word-segment)
+  ├─ PhoBERT (slow tokenizer, use_fast=False) → H [B,T,768]
+  └─ LexiconStore (12D, mask theo từng chiều) → L [B,T,12] + presence
+        → LexiconProjection → L̃ [B,T,768]
+  g = σ(W_g [H; L̃] + b)                  # gate 768 chiều
+  F = H + g ⊙ L̃                          # residual, OOV → F = H tuyệt đối
+  masked mean pooling → z [B,768]
+  classifier → logits [B,3] (UIT/VLSP) hoặc [B,2] (AIVIVN)
 ```
 
-Sau khi `conda activate nlpdevelop`, có thể dùng `python -m pytest tests/ -q`. Pytest thêm `src` vào import path qua `pyproject.toml`; không cần editable install. Foundation tests không cần torch, transformers, mạng hoặc pretrained weights. Runtime dependencies vẫn được khai báo để phục vụ Giai đoạn B; chưa cài hoặc tải mô hình trong đợt reset.
+- Mode `fused` (mặc định khi train/infer): chạy cả hai nhánh.
+- Mode `contextual`: chỉ PhoBERT, dùng cho ablation.
+- Lexicon lookup miss → zero vector + zero presence; special tokens giữ nguyên `H`.
 
-## Cấu trúc đã tạo
+## Kết quả hiện có
 
-| Thư mục | Trách nhiệm dành cho các tính năng tiếp theo |
-| --- | --- |
-| `src/vnsentiment/contracts/` | Mỗi data contract một file |
-| `src/vnsentiment/lexicon/` | Tách validation, loader và lookup store |
-| `src/vnsentiment/alignment/` | Tách word alignment, truncation và lexical broadcast |
-| `src/vnsentiment/data/` | Tách JSONL reader, preparation, padding và collator |
-| `src/vnsentiment/backbones/` | Tách loader tokenizer và encoder |
-| `src/vnsentiment/models/fusion/` | Mỗi projection, gate và fusion mode một file |
-| `src/vnsentiment/models/` | Classifier điều phối; pooling độc lập |
-| `src/vnsentiment/training/` | Tách move batch, train step và train epoch |
-| `src/vnsentiment/evaluation/` | Mỗi metric và evaluate loop một file |
-| `src/vnsentiment/diagnostics/` | Inspect alignment và metadata batch |
-| `tests/architecture/` | Kiểm tra import, trách nhiệm, kích thước và dependency |
-| `tests/helpers/` | Vị trí cho fake encoder/tokenizer và fixture builders |
-| `tests/unit/` | Test phản chiếu từng module sản phẩm |
-| `tests/integration/` | Vị trí cho pipeline offline và smoke opt-in về sau |
+| Dataset | Model | Accuracy | Macro-F1 | Report |
+|---|---|---:|---:|---|
+| UIT-VSFC | PhoBERT + lexicon fusion | 0,9409 | 0,8451 | `artifacts/reports/test_eval.json` |
+| VLSP2016 | zero-shot từ UIT | 0,5333 | 0,5123 | `artifacts/reports/vlsp2016_test_best.json` |
+| VLSP2016 | fine-tune trên VLSP train | 0,7524 | 0,7532 | `artifacts/reports/vlsp2016_test_finetuned.json` |
+| AIVIVN 2019 | binary, train trên AIVIVN | 0,9148 | 0,9131 | `artifacts/reports/aivivn2019_test.json` |
 
-Các thư mục nghiệp vụ hiện chỉ chứa `__init__.py` có docstring, không có implementation giả. Danh sách tên file/API dự kiến và roadmap Giai đoạn B nằm trong [plan đã duyệt](.hermes/plans/2026-10-12_094933-reset-source-modular-debuggable-structure.md).
+**Caveat:**
+- AIVIVN test là split nội bộ (toàn bộ ID `train_*`, 8 văn bản trùng train sau split), không phải public test chính thức.
+- VLSP2016 test đã được dùng nhiều lần; các kết quả VLSP chỉ nên xem là exploratory, không phải holdout sạch.
+- UIT-VSFC test đã dùng một lần cho pipeline hiện tại.
+- Không dùng test để chọn threshold/epoch/lexicon.
 
-## Quy tắc giữ source dễ debug
+## Cấu trúc repo
 
-- Một file có tối đa một public function/class chính và hai top-level private helpers; methods cùng trách nhiệm ở cùng class.
-- Guardrail 200 dòng/file, 50 dòng/function hoặc method. Không chia vụn wrapper vô nghĩa hoặc nhồi statements để lách giới hạn.
-- Không tạo file gom chung `utils.py`, `common.py`, `types.py`, `errors.py`, `validator.py`, `trainer.py` hoặc tương đương.
-- `__init__.py` chỉ chứa docstring: không eager imports, I/O, tải tokenizer/model.
-- Model không import data/training/evaluation. Dependency direction được kiểm tra bằng AST; dynamic imports và semantics vẫn cần review thủ công.
-- Lỗi architecture test chỉ rõ file hoặc cạnh import vi phạm; chạy riêng test module liên quan trước khi chạy toàn bộ suite.
+```text
+src/vnsentiment/
+├── preprocessing/      # NFC/lowercase, variant map, VnCoreNLP segmenter
+├── phobert_branch/     # tokenizer, encoder, BackboneBatch (word_ids)
+├── lexicon/            # LexiconStore, features/alignment, profile, CLI
+├── models/             # SentimentModel
+│   └── fusion/         # projection, gate, residual, pooling, classifier
+├── training/           # data loaders, train step, loop, metrics, evaluate, factory
+├── contracts/          # BackboneBatch, LexicalBatch, TrainBatch
+├── inference.py        # SentimentPredictor
+└── inspection.py       # CLI diagnostics cho preprocessing/PhoBERT
 
-## Ràng buộc nghiên cứu cho Giai đoạn B
+scripts/                # prepare/train/benchmark/build/figures
+tests/                  # unit + integration
+data/                   # raw/processed/lexicons (gitignored)
+artifacts/              # checkpoints/reports/logs/cache (gitignored)
+plans-and-report/       # Obsidian vault: plans, sessions, index (gitignored)
+```
 
-Input phải là tiếng Việt đã word-segmented; normalization không tự segmentation. Lexicon ngoài có polarity, VAD và tám chiều emotion, phân biệt `null` với true zero. Thiết kế đích là token-level fusion trước content-only pooling, bốn chế độ contextual/concat/residual/gated; chưa được triển khai.
+## Môi trường
 
-Không có kết quả accuracy/F1 mới, dataset/lexicon giả hoặc cam kết gate phát hiện ca khó. Fixtures tương lai chỉ kiểm thử phần mềm. Không mở rộng lexicon trên dev/test; hard-case tags chỉ dùng evaluation.
+- Python >= 3.12, Conda env `nlpdevelop`.
+- `D:/anaconda/envs/nlpdevelop/python.exe` hoặc `conda activate nlpdevelop`.
+- Dependencies: `torch>=2.0`, `transformers>=4.40`, `pytest>=8.0`.
+- GPU hiện tại: Quadro RTX 3000 6 GB, `torch 2.14.1+cu130`.
+- Không tạo `.venv` trong workspace.
 
-## Tài liệu và tài nguyên được giữ
+```bash
+D:/anaconda/envs/nlpdevelop/python.exe -m pytest tests/ -q
+```
 
-- `docs/`, bao gồm báo cáo Word và `docs/Part2/figures/draw_architecture.py`, không bị reset.
-- `data/`, `configs/`, cache/run cũ và `.gitignore` được giữ nguyên.
-- Dashboard và báo cáo bàn giao: [docs_obsidian/00-INDEX.md](docs_obsidian/00-INDEX.md).
-- Không có Git repository; không tự init, commit hoặc push.
-- AGENTS.md và CLAUDE.md chưa được đồng bộ với reset: quyền ghi AGENTS.md hết hạn, lượt ghi CLAUDE.md bị từ chối bởi partial-read guard. Các mô tả API/test cũ trong hai file đó là lịch sử, không phải tính năng hiện có. Xem dashboard/session mới để biết trạng thái thực tế.
+Kết quả hiện tại: **262 passed, 5 skipped, 22 subtests**.
+
+## Lệnh chính
+
+```bash
+# Kiểm tra preprocessing + lexicon + PhoBERT hidden states
+D:/anaconda/envs/nlpdevelop/python.exe main.py
+
+# UIT-VSFC (3 lớp)
+D:/anaconda/envs/nlpdevelop/python.exe scripts/train_sentiment.py
+D:/anaconda/envs/nlpdevelop/python.exe scripts/evaluate_test.py
+D:/anaconda/envs/nlpdevelop/python.exe scripts/predict_sentiment.py
+
+# VLSP2016 (3 lớp)
+D:/anaconda/envs/nlpdevelop/python.exe scripts/prepare_vlsp2016.py
+D:/anaconda/envs/nlpdevelop/python.exe scripts/train_vlsp2016.py
+D:/anaconda/envs/nlpdevelop/python.exe scripts/benchmark_vlsp2016.py
+
+# AIVIVN 2019 (binary)
+D:/anaconda/envs/nlpdevelop/python.exe scripts/prepare_aivivn2019.py
+D:/anaconda/envs/nlpdevelop/python.exe scripts/train_aivivn2019.py
+D:/anaconda/envs/nlpdevelop/python.exe scripts/benchmark_aivivn2019.py
+
+# Ảnh benchmark cho slides (PNG 200 dpi + SVG)
+D:/anaconda/envs/nlpdevelop/python.exe scripts/make_benchmark_figures.py
+```
+
+## Lexicon
+
+- Composite frozen: `data/lexicons/composite_12d/v0.2.0/` — 9.525 entries.
+- Mở rộng offline:
+  - `v0.3.2` — WordNet synonym + guard VAD: 9.791 entries; polarity train 23,70% → 27,45%.
+  - `v0.3.3` — thêm fastText kNN + guard: 9.888 entries; polarity train 23,70% → 27,86%.
+  - `v0.3.0`/`v0.3.1` là bản trước guard, chỉ giữ làm bằng chứng audit.
+- `factory.build_sentiment_model(..., lexicon_path=...)` đã hỗ trợ chọn version; CLI train hiện vẫn mặc định `v0.2.0`.
+- Build lại:
+  ```bash
+  D:/anaconda/envs/nlpdevelop/python.exe scripts/build_expanded_lexicon.py \
+    --version 0.3.2 --output-dir data/lexicons/composite_12d/v0.3.2
+  ```
+
+## Tài liệu
+
+- Dashboard: `plans-and-report/00-INDEX.md`.
+- Plans: `plans-and-report/01-PLANS/`.
+- Session logs: `plans-and-report/02-FEATURE-SESSIONS/`.
+- Kiến trúc hai nhánh: `docs/Part2/figures/two_branch_adaptive_fusion.png` / `.svg`.
+
+## License dữ liệu
+
+UIT-VSFC, VLSP2016, AIVIVN 2019, VietSentiWordNet, NRC-VAD, VnEmoLex và Vietnamese WordNet chỉ dùng cho nghiên cứu; **không tái phân phối**. `data/` và `artifacts/` không được commit.
