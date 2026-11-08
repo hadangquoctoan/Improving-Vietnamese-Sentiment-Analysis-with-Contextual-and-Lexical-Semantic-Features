@@ -76,7 +76,7 @@ class SentimentPredictorTests(unittest.TestCase):
             torch.save({"model_state": self.model.state_dict()}, checkpoint)
             with mock.patch(
                 "vnsentiment.inference.build_sentiment_model",
-                side_effect=lambda device: _build_model(self.store),
+                side_effect=lambda device, num_labels=3: _build_model(self.store),
             ):
                 loaded = SentimentPredictor.from_checkpoint(
                     checkpoint, device="cpu"

@@ -26,6 +26,7 @@ class Trainer:
         seed: int = 42,
         checkpoint_path: str | Path | None = None,
         verbose: bool = False,
+        num_classes: int = 3,
     ):
         self.model = model.to(device)
         self.device = torch.device(device)
@@ -38,6 +39,7 @@ class Trainer:
             Path(checkpoint_path) if checkpoint_path is not None else None
         )
         self.verbose = verbose
+        self.num_classes = num_classes
         self.optimizer = _build_optimizer(
             self.model, lr_encoder, lr_fusion, weight_decay
         )
@@ -124,7 +126,9 @@ class Trainer:
             logits = self.model(batch.texts)
             predictions.append(logits.argmax(dim=-1).cpu())
             labels.append(batch.labels.cpu())
-        return compute_metrics(torch.cat(predictions), torch.cat(labels))
+        return compute_metrics(
+            torch.cat(predictions), torch.cat(labels), num_classes=self.num_classes
+        )
 
     def _apply_gradients(self) -> None:
         clip_grad_norm_(self.model.parameters(), 1.0)

@@ -2,15 +2,17 @@
 
 import torch
 
-_NUM_CLASSES = 3
 
-
-def compute_metrics(preds: torch.Tensor, labels: torch.Tensor) -> dict:
+def compute_metrics(
+    preds: torch.Tensor, labels: torch.Tensor, num_classes: int = 3
+) -> dict:
     if preds.numel() == 0 or labels.numel() == 0:
         raise ValueError("preds and labels must not be empty")
+    if num_classes < 2:
+        raise ValueError("num_classes must be at least 2")
 
     f1_per_class = []
-    for label in range(_NUM_CLASSES):
+    for label in range(num_classes):
         predicted = preds == label
         actual = labels == label
         true_positive = (predicted & actual).sum().item()
@@ -23,6 +25,6 @@ def compute_metrics(preds: torch.Tensor, labels: torch.Tensor) -> dict:
 
     return {
         "accuracy": (preds == labels).sum().item() / labels.numel(),
-        "macro_f1": sum(f1_per_class) / _NUM_CLASSES,
+        "macro_f1": sum(f1_per_class) / num_classes,
         "f1_per_class": tuple(f1_per_class),
     }
