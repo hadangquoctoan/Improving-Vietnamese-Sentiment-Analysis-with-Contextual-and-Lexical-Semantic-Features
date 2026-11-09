@@ -1,0 +1,12 @@
+# Versions verified on the demo machine (2026-11-09, Python 3.12, Windows 11, RTX 5060 Laptop).
+# Install torch first from the PyTorch index that matches your GPU, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128   (RTX 50xx / Blackwell needs cu128+)
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu     (no NVIDIA GPU)
+# then: pip install -r demo/requirements-demo.txt
+transformers==5.22.2
+fastapi==0.162.2
+uvicorn==0.54.0
+py_vncorenlp==0.1.4
+pyjnius==1.9.0
+httpx==0.28.1
+pytest==9.2.0

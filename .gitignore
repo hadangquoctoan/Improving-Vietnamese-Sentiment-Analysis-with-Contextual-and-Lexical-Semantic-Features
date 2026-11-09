@@ -1,0 +1,15 @@
+# Datasets and model artifacts: research-only licences, never redistribute; checkpoints are ~545 MB each
+data/
+artifacts/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Local tooling / stray files
+.gstack/
+dev/
+*.original.md

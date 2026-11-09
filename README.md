@@ -96,6 +96,10 @@ D:/anaconda/envs/nlpdevelop/python.exe scripts/benchmark_aivivn2019.py
 D:/anaconda/envs/nlpdevelop/python.exe scripts/make_benchmark_figures.py
 ```
 
+## Demo (Report 4)
+
+Giao diện web + API chạy các checkpoint đã train: nhấp đúp `demo/START_DEMO.bat`, mở `http://127.0.0.1:8000`. Hướng dẫn nhanh: [`DEMO.md`](DEMO.md). Cài đặt chi tiết, tài nguyên cần tải và hợp đồng API: [`demo/README.md`](demo/README.md).
+
 ## Lexicon
 
 - Composite frozen: `data/lexicons/composite_12d/v0.2.0/` — 9.525 entries.
